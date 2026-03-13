@@ -21,7 +21,7 @@ DEFAULT_CUTOFF_PATTERNS = [
 _BLANK_LINES_RE = re.compile(r"\n{3,}")
 
 
-def clean_text(text, cutoff_patterns=None, min_keep_ratio=0.3):
+def clean_text(text, cutoff_patterns=None, min_keep_ratio=0.3, strip_urls=True):
     """
     Remove known ad/legal footers and clean up whitespace.
 
@@ -32,6 +32,8 @@ def clean_text(text, cutoff_patterns=None, min_keep_ratio=0.3):
         min_keep_ratio: safety guard — if truncation would remove more than
                         (1 - min_keep_ratio) of the text, skip it and warn.
                         Default 0.3 means at least 30% of content must survive.
+        strip_urls: whether to remove URLs from the text (default: True).
+                    Set to False for non-financial documents where URLs are useful.
 
     Returns:
         cleaned text
@@ -57,8 +59,9 @@ def clean_text(text, cutoff_patterns=None, min_keep_ratio=0.3):
                 text = kept
                 logger.debug(f"Truncated at ad pattern (pos {m.start()}, kept {keep_ratio:.0%})")
 
-    # Remove URLs
-    text = re.sub(r"https?://\S+|mma\.tw/\S+", "", text)
+    # Remove URLs (configurable — disable for non-financial documents)
+    if strip_urls:
+        text = re.sub(r"https?://\S+|mma\.tw/\S+", "", text)
 
     # Compress excessive blank lines
     text = _BLANK_LINES_RE.sub("\n\n", text)

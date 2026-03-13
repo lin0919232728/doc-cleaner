@@ -15,7 +15,7 @@ import logging
 import tempfile
 from pathlib import Path
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 logger = logging.getLogger("doc-cleaner")
 
@@ -188,7 +188,8 @@ def parse_file(filepath, config):
         pdf_type, raw_text, metadata = classify(target)
 
         cutoff_patterns = config.get("ad_truncation_patterns")
-        text = clean_text(raw_text, cutoff_patterns=cutoff_patterns)
+        strip_urls = config.get("strip_urls", True)
+        text = clean_text(raw_text, cutoff_patterns=cutoff_patterns, strip_urls=strip_urls)
 
         if pdf_type in (PdfType.SCANNED, PdfType.LAYOUT_BROKEN):
             dpi = pdf_config.get("dpi", 200)
@@ -240,6 +241,14 @@ def process_file(filepath, ai_backend, prompt, config, output_dir, dry_run=False
     stem = os.path.splitext(filename)[0]
     output_path = os.path.join(output_dir, f"{stem}.md")
 
+    # Avoid overwriting existing output from a different source file
+    if os.path.exists(output_path):
+        counter = 1
+        while os.path.exists(os.path.join(output_dir, f"{stem}_{counter}.md")):
+            counter += 1
+        output_path = os.path.join(output_dir, f"{stem}_{counter}.md")
+        logger.info(f"  Output collision: {stem}.md exists, using {stem}_{counter}.md")
+
     logger.info(f"Processing: {filename}")
 
     if dry_run:
@@ -261,20 +270,38 @@ def process_file(filepath, ai_backend, prompt, config, output_dir, dry_run=False
             from ai.base import clean_json_response
             from output.markdown import render_ai_output, render_raw_output
 
-            try:
-                raw_response = ai_backend.call(prompt=prompt, images=images, text=text)
-            except Exception as ai_err:
-                # AI call failed (network error, model crash, etc.)
+            # Retry once on transient errors (429/503/timeout) before fallback
+            max_retries = config.get("ai", {}).get("max_retries", 1)
+            raw_response = None
+            last_err = None
+            for attempt in range(1 + max_retries):
+                try:
+                    raw_response = ai_backend.call(prompt=prompt, images=images, text=text)
+                    break
+                except Exception as ai_err:
+                    last_err = ai_err
+                    if attempt < max_retries:
+                        import time
+                        wait = 2 ** attempt  # 1s, 2s, ...
+                        logger.warning(
+                            f"  AI call failed ({ai_err}), retrying in {wait}s "
+                            f"(attempt {attempt + 1}/{1 + max_retries})"
+                        )
+                        time.sleep(wait)
+
+            if raw_response is None:
+                # All retries exhausted — fall back to raw mode if we have text
                 if text:
                     logger.warning(
-                        f"  AI call failed ({ai_err}) — falling back to raw mode"
+                        f"  AI call failed after {1 + max_retries} attempts ({last_err}) "
+                        f"— falling back to raw mode"
                     )
                     content = render_raw_output(
                         text, filename, source_path=filename,
                         frontmatter=frontmatter,
                     )
                 else:
-                    raise  # no text to fall back on, propagate error
+                    raise last_err  # no text to fall back on, propagate error
             else:
                 data = clean_json_response(raw_response)
 
@@ -329,9 +356,13 @@ def process_file(filepath, ai_backend, prompt, config, output_dir, dry_run=False
 def collect_files(input_path):
     """Collect processable files from a path (file or directory)."""
     if os.path.isfile(input_path):
-        ext = os.path.splitext(input_path)[1].lower()
+        # Security: resolve symlinks to prevent directory traversal
+        real_path = os.path.realpath(input_path)
+        if os.path.islink(input_path):
+            logger.info(f"Resolved symlink: {input_path} → {real_path}")
+        ext = os.path.splitext(real_path)[1].lower()
         if ext in SUPPORTED_EXTENSIONS:
-            return [input_path]
+            return [real_path]
         else:
             logger.warning(f"Unsupported file type: {input_path}")
             return []

@@ -11,14 +11,35 @@ logger = logging.getLogger(__name__)
 
 
 def _table_to_markdown(table):
-    """Convert a python-docx table to a Markdown pipe table."""
+    """Convert a python-docx table to a Markdown pipe table.
+
+    Heuristic for header detection: if the first row has distinct content
+    from most other rows (i.e. not all-numeric), treat it as a header.
+    Otherwise, generate a blank header row so the Markdown table is still valid.
+    """
+    if not table.rows:
+        return ""
     rows = []
     for row in table.rows:
         cells = [cell.text.strip().replace("|", "\\|") for cell in row.cells]
         rows.append("| " + " | ".join(cells) + " |")
-    if len(rows) >= 1:
-        header_sep = "| " + " | ".join(["---"] * len(table.rows[0].cells)) + " |"
+    num_cols = len(table.rows[0].cells)
+    header_sep = "| " + " | ".join(["---"] * num_cols) + " |"
+
+    # Detect if first row looks like a header: has at least one non-empty,
+    # non-numeric cell that differs from a typical data row pattern
+    first_cells = [cell.text.strip() for cell in table.rows[0].cells]
+    has_header = any(c and not c.replace(",", "").replace(".", "").replace("-", "").isdigit()
+                     for c in first_cells)
+
+    if has_header:
         rows.insert(1, header_sep)
+    else:
+        # Prepend a blank header so Markdown renderers still show a valid table
+        blank_header = "| " + " | ".join([""] * num_cols) + " |"
+        rows.insert(0, blank_header)
+        rows.insert(1, header_sep)
+
     return "\n".join(rows)
 
 

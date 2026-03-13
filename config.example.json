@@ -2,6 +2,7 @@
   "ai": {
     "backend": "gemini",
     "prompt_template": "prompts/default.txt",
+    "max_retries": 1,
     "gemini": {
       "model": "gemini-2.5-pro"
     },
@@ -17,6 +18,7 @@
   "output": {
     "frontmatter": true
   },
+  "strip_urls": true,
   "ad_truncation_patterns": [
     "<投資人權益通知訊息[ >]",
     "[～~]\\s*總\\s*公\\s*司\\s*訊\\s*息\\s*[～~]",

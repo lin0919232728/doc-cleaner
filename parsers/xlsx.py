@@ -47,8 +47,16 @@ def parse(filepath, max_chars_per_sheet=8000):
             df = df.fillna("")
             md = df.to_markdown(index=False)
             if len(md) > max_chars_per_sheet:
-                md = df.head(80).to_markdown(index=False)
-                md += f"\n\n_(truncated: {len(df)} rows total / 截斷：原始共 {len(df)} 行)_"
+                # Binary search for max rows that fit within the char budget
+                lo, hi = 1, len(df)
+                while lo < hi:
+                    mid = (lo + hi + 1) // 2
+                    if len(df.head(mid).to_markdown(index=False)) <= max_chars_per_sheet:
+                        lo = mid
+                    else:
+                        hi = mid - 1
+                md = df.head(lo).to_markdown(index=False)
+                md += f"\n\n_(truncated: {len(df)} rows total, showing {lo} / 截斷：原始共 {len(df)} 行，顯示 {lo} 行)_"
             parts.append(f"## Sheet: {name}\n\n{md}")
         return "\n\n".join(parts)
 

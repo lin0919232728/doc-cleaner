@@ -115,28 +115,6 @@ def extract_images(filepath, dpi=200, max_pages=15):
         return []
 
 
-def extract_text(filepath, max_chars=150_000):
-    """
-    Extract native text from PDF using PyMuPDF (fitz).
-
-    Returns raw text string. Returns empty string if fitz is not installed
-    or the PDF has no extractable text layer.
-    """
-    if not fitz:
-        logger.warning("PyMuPDF (fitz) not installed — cannot extract PDF text")
-        return ""
-    try:
-        with fitz.open(filepath) as doc:
-            parts = []
-            for page in doc:
-                parts.append(page.get_text())
-                if sum(len(p) for p in parts) > max_chars:
-                    break
-        return "".join(parts)[:max_chars]
-    except Exception as e:
-        logger.error(f"PDF text extraction failed: {e}")
-        return ""
-
 
 def get_page_count(filepath):
     """Return the number of pages in a PDF."""

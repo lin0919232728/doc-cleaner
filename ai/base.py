@@ -57,6 +57,12 @@ def clean_json_response(raw_text):
         s = s[:-3]
     s = s.strip()
 
+    # Try direct parse first — avoid unnecessary repair that may corrupt valid JSON
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError:
+        pass
+
     # Auto-fix trailing commas
     s = re.sub(r",\s*([\]}])", r"\1", s)
 
