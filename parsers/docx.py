@@ -26,11 +26,15 @@ def _table_to_markdown(table):
     num_cols = len(table.rows[0].cells)
     header_sep = "| " + " | ".join(["---"] * num_cols) + " |"
 
-    # Detect if first row looks like a header: has at least one non-empty,
-    # non-numeric cell that differs from a typical data row pattern
+    # Detect if first row looks like a header: default to True (safer for
+    # CJK tables where dates like "2024-01-15" or amounts like "1,234.56"
+    # would be misclassified as pure numbers by the old strip-and-isdigit check).
+    # Only treat as non-header if ALL cells are empty or plain integers.
     first_cells = [cell.text.strip() for cell in table.rows[0].cells]
-    has_header = any(c and not c.replace(",", "").replace(".", "").replace("-", "").isdigit()
-                     for c in first_cells)
+    all_empty_or_integer = all(
+        not c or c.lstrip("-").isdigit() for c in first_cells
+    )
+    has_header = not all_empty_or_integer
 
     if has_header:
         rows.insert(1, header_sep)

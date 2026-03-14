@@ -56,7 +56,11 @@ def parse(filepath, max_chars_per_sheet=8000):
                     else:
                         hi = mid - 1
                 md = df.head(lo).to_markdown(index=False)
-                md += f"\n\n_(truncated: {len(df)} rows total, showing {lo} / 截斷：原始共 {len(df)} 行，顯示 {lo} 行)_"
+                # Safety: if even 1 row exceeds budget (very wide table), hard-truncate
+                if len(md) > max_chars_per_sheet:
+                    md = md[:max_chars_per_sheet] + "\n\n_(content truncated due to wide table)_"
+                else:
+                    md += f"\n\n_(truncated: {len(df)} rows total, showing {lo} / 截斷：原始共 {len(df)} 行，顯示 {lo} 行)_"
             parts.append(f"## Sheet: {name}\n\n{md}")
         return "\n\n".join(parts)
 

@@ -115,7 +115,6 @@ def extract_images(filepath, dpi=200, max_pages=15):
         return []
 
 
-
 def get_page_count(filepath):
     """Return the number of pages in a PDF."""
     if not fitz:

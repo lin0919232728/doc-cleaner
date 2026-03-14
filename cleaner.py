@@ -10,12 +10,13 @@ import os
 import re
 import sys
 import json
+import time
 import argparse
 import logging
 import tempfile
 from pathlib import Path
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 logger = logging.getLogger("doc-cleaner")
 
@@ -316,7 +317,6 @@ def process_file(filepath, ai_backend, prompt, config, output_dir, dry_run=False
                 except Exception as ai_err:
                     last_err = ai_err
                     if attempt < max_retries:
-                        import time
                         wait = 2 ** attempt  # 1s, 2s, ...
                         logger.warning(
                             f"  AI call failed ({ai_err}), retrying in {wait}s "
